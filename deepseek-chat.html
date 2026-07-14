@@ -10,6 +10,8 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #0b0f1f;
     height: 100vh;
+    height: 100dvh;
+    height: calc(var(--vh, 1vh) * 100);
     overflow: hidden;
     position: relative;
   }
@@ -24,7 +26,7 @@
     filter: blur(40px); pointer-events: none;
   }
   #app {
-    display: flex; height: 100vh;
+    display: flex; height: 100vh; height: 100dvh; height: calc(var(--vh, 1vh) * 100);
     position: relative; z-index: 1;
   }
 
@@ -483,6 +485,14 @@
 </div>
 
 <script>
+  // 兼容移动端浏览器地址栏动态显隐导致的 100vh 计算问题
+  function setVhVar() {
+    document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px');
+  }
+  setVhVar();
+  window.addEventListener('resize', setVhVar);
+  window.addEventListener('orientationchange', setVhVar);
+
   let conversations = [];
   let activeId = null;
   let loading = false;
