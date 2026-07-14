@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Nimbus</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0b0f1f;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+  .glow-1 {
+    position: absolute; top: -15%; left: -10%; width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%);
+    filter: blur(40px); pointer-events: none;
+  }
+  .glow-2 {
+    position: absolute; bottom: -15%; right: -10%; width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 70%);
+    filter: blur(40px); pointer-events: none;
+  }
+  #app {
+    display: flex; height: 100vh;
+    position: relative; z-index: 1;
+  }
+
+  #sidebar {
+    width: 260px; flex-shrink: 0;
+    background: rgba(255,255,255,0.02);
+    border-right: 1px solid rgba(255,255,255,0.08);
+    display: flex; flex-direction: column;
+    padding: 16px 12px;
+    transition: margin-left 0.25s ease;
+  }
+  #sidebar.collapsed { margin-left: -260px; }
+  #new-chat-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white; border: none; border-radius: 12px;
+    font-size: 13.5px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(99,102,241,0.3);
+    margin-bottom: 16px;
+  }
+  #new-chat-btn:hover { filter: brightness(1.08); }
+  #chat-list {
+    flex: 1; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .chat-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border-radius: 10px;
+    color: #b8bce0; font-size: 13px; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .chat-item:hover { background: rgba(255,255,255,0.05); }
+  .chat-item.active { background: rgba(255,255,255,0.08); color: #fff; }
+  .chat-item .title { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .chat-item .del-btn {
+    opacity: 0; flex-shrink: 0; font-size: 13px; color: #8b8fb5;
+    padding: 2px 5px; border-radius: 5px;
+  }
+  .chat-item:hover .del-btn { opacity: 1; }
+  .chat-item .del-btn:hover { color: #f87171; background: rgba(248,113,113,0.1); }
+  .chat-item .pin-btn, .chat-item .rename-btn {
+    opacity: 0; flex-shrink: 0; font-size: 12px; color: #8b8fb5;
+    padding: 2px 5px; border-radius: 5px;
+  }
+  .chat-item:hover .pin-btn, .chat-item:hover .rename-btn { opacity: 1; }
+  .chat-item.pinned .pin-btn { opacity: 1; color: #a5a8ff; }
+  .chat-item .pin-btn:hover { color: #a5a8ff; background: rgba(165,168,255,0.12); }
+  .chat-item .rename-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+  .chat-item .rename-input {
+    flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(99,102,241,0.5);
+    border-radius: 6px; color: #fff; font-size: 13px; padding: 4px 8px; outline: none;
+    width: 100%;
+  }
+  .pin-divider {
+    font-size: 10.5px; color: #6b7299; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 10px 12px 4px; font-weight: 600;
+  }
+
+  #main {
+    display: flex; flex-direction: column; flex: 1; min-width: 0;
+    position: relative; z-index: 1;
+  }
+  #header {
+    background: rgba(255,255,255,0.03);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 18px 24px;
+    display: flex; justify-content: center;
+  }
+  #header-inner {
+    width: 100%; max-width: 720px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .logo-row { display: flex; align-items: center; gap: 10px; }
+  #sidebar-toggle {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #d1d5f0; width: 34px; height: 34px;
+    border-radius: 10px; cursor: pointer; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  #header h1 { color: white; font-size: 17px; font-weight: 700; letter-spacing: 0.2px; }
+  .header-btns { display: flex; gap: 8px; }
+  .header-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #d1d5f0;
+    padding: 9px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 500;
+    transition: background 0.2s;
+  }
+  .header-btn:hover { background: rgba(255,255,255,0.14); }
+
+  #messages-wrap {
+    flex: 1; overflow-y: auto; padding: 24px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  #messages {
+    width: 100%; max-width: 720px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .empty-state {
+    display: flex; align-items: center; justify-content: center;
+    height: 60vh; color: #6b7299; flex-direction: column; gap: 14px;
+  }
+  .empty-icon {
+    font-size: 40px; width: 72px; height: 72px; border-radius: 20px;
+    background: rgba(255,255,255,0.04);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .msg-row {
+    display: flex; align-items: flex-end; gap: 8px;
+    animation: fadeIn 0.25s ease;
+  }
+  .msg-row.user { justify-content: flex-end; }
+  .msg-row.assistant { justify-content: flex-start; }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+  .bubble {
+    padding: 13px 17px; line-height: 1.6; font-size: 14.5px;
+    white-space: pre-wrap; word-wrap: break-word;
+    width: fit-content; max-width: 100%;
+  }
+  .bubble.assistant { white-space: normal; }
+  .bubble.user {
+    border-radius: 18px 18px 4px 18px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    box-shadow: 0 4px 14px rgba(99,102,241,0.3);
+  }
+  .bubble.assistant {
+    border-radius: 18px 18px 18px 4px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #e4e6f5;
+  }
+  .bubble.assistant p { margin: 0 0 10px; }
+  .bubble.assistant p:last-child { margin-bottom: 0; }
+  .bubble.assistant strong { font-weight: 700; color: #fff; }
+  .bubble.assistant em { font-style: italic; }
+  .bubble.assistant ul, .bubble.assistant ol { margin: 0 0 10px 20px; }
+  .bubble.assistant li { margin-bottom: 4px; }
+  .bubble.assistant a { color: #a5b4fc; text-decoration: underline; }
+  .bubble.assistant code {
+    background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 5px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 13px;
+    color: #f0abfc;
+  }
+  .code-block {
+    background: #12141f; border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; margin: 8px 0 12px; overflow: hidden;
+  }
+  .code-block-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 14px; background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 11.5px; color: #8b8fb5; font-family: monospace;
+  }
+  .code-copy-btn {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    color: #b8bce0; font-size: 11px; padding: 3px 9px; border-radius: 6px;
+    cursor: pointer;
+  }
+  .code-copy-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+  .code-block pre {
+    margin: 0; padding: 14px; overflow-x: auto;
+  }
+  .code-block code {
+    background: none; padding: 0; font-size: 13px; line-height: 1.5;
+    color: #d4d8f0; font-family: 'SF Mono', Monaco, Consolas, monospace;
+  }
+  .cursor-blink {
+    display: inline-block; width: 2px; height: 14px; background: #a5b4fc;
+    margin-left: 2px; animation: blink 1s step-start infinite; vertical-align: middle;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .msg-col { display: flex; flex-direction: column; gap: 4px; max-width: 75%; }
+  .msg-col.user { align-items: flex-end; }
+  .msg-col.assistant { align-items: flex-start; }
+  .msg-actions {
+    display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s;
+    padding: 0 4px;
+  }
+  .msg-row:hover .msg-actions { opacity: 1; }
+  .action-btn {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+    color: #9ca3d4; font-size: 11.5px; padding: 4px 9px; border-radius: 7px;
+    cursor: pointer; display: flex; align-items: center; gap: 4px;
+  }
+  .action-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .edit-textarea {
+    width: 100%; min-width: 260px; padding: 12px 16px;
+    border: 1px solid rgba(99,102,241,0.4); border-radius: 14px;
+    font-size: 14.5px; font-family: inherit; line-height: 1.6;
+    background: rgba(255,255,255,0.06); color: #fff; outline: none; resize: vertical;
+  }
+  .edit-actions { display: flex; gap: 8px; margin-top: 6px; }
+  .edit-btn {
+    padding: 7px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; border: none;
+  }
+  .edit-btn.save { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; }
+  .edit-btn.cancel { background: rgba(255,255,255,0.08); color: #d1d5f0; }
+  .loading-row {
+    display: flex; align-items: center; gap: 8px; color: #9ca3d4; font-size: 13.5px;
+    padding: 13px 17px; background: rgba(255,255,255,0.06);
+    border-radius: 18px 18px 18px 4px; width: fit-content;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .spinner {
+    width: 15px; height: 15px; border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: #9ca3d4; border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  #input-bar {
+    padding: 16px 20px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    background: rgba(255,255,255,0.03);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    display: flex; justify-content: center;
+  }
+  #input-inner {
+    width: 100%; max-width: 720px;
+    display: flex; gap: 10px; align-items: flex-end;
+  }
+  #input-box {
+    flex: 1; padding: 12px 16px;
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+    font-size: 14.5px; font-family: inherit; resize: none; max-height: 100px;
+    background: rgba(255,255,255,0.05); color: #fff; outline: none;
+  }
+  #input-box::placeholder { color: #6b7299; }
+  #send-btn {
+    padding: 12px 18px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white; border: none; border-radius: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    min-width: 48px; height: 46px;
+    box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+  }
+  #send-btn:disabled {
+    background: rgba(255,255,255,0.08); cursor: not-allowed; box-shadow: none;
+  }
+  #expand-btn {
+    padding: 0; width: 46px; height: 46px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #9ca3d4; border-radius: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+  }
+  #expand-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  #search-toggle-btn {
+    padding: 0 14px; height: 46px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #9ca3d4; border-radius: 14px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 500; flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  #search-toggle-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  #search-toggle-btn.active {
+    background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.25));
+    border-color: rgba(99,102,241,0.5); color: #c7d2fe;
+  }
+  .search-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: #a5b4fc; background: rgba(99,102,241,0.15);
+    padding: 4px 9px; border-radius: 7px; margin-bottom: 8px;
+    border: 1px solid rgba(99,102,241,0.25);
+  }
+  .search-sources {
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 12px; color: #8b8fb5;
+  }
+  .search-sources a { color: #a5b4fc; text-decoration: none; }
+  .search-sources a:hover { text-decoration: underline; }
+
+  #fullscreen-input-overlay {
+    position: fixed; inset: 0; background: rgba(10,10,20,0.85);
+    backdrop-filter: blur(6px); z-index: 1100;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px;
+  }
+  #fullscreen-input-overlay.hidden { display: none; }
+  #fs-header {
+    width: 100%; max-width: 800px; display: flex; justify-content: space-between;
+    align-items: center; margin-bottom: 16px;
+  }
+  #fs-header h3 { color: #fff; font-size: 15px; font-weight: 600; }
+  #fs-close-btn {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);
+    color: #d1d5f0; width: 32px; height: 32px; border-radius: 9px;
+    cursor: pointer; font-size: 14px;
+  }
+  #fs-close-btn:hover { background: rgba(255,255,255,0.14); }
+  #fs-textarea {
+    width: 100%; max-width: 800px; flex: 1;
+    padding: 24px; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+    font-size: 15.5px; line-height: 1.7; font-family: inherit; resize: none;
+    background: rgba(255,255,255,0.05); color: #fff; outline: none;
+  }
+  #fs-footer {
+    width: 100%; max-width: 800px; display: flex; justify-content: flex-end;
+    gap: 10px; margin-top: 16px;
+  }
+  #fs-send-btn {
+    padding: 12px 22px; background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white; border: none; border-radius: 12px; cursor: pointer;
+    font-size: 14px; font-weight: 600;
+    box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+  }
+  #fs-send-btn:disabled { background: rgba(255,255,255,0.08); cursor: not-allowed; box-shadow: none; }
+
+  #settings-overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,10,20,0.7);
+    backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 20px;
+  }
+  #settings-overlay.hidden { display: none; }
+  #settings-panel {
+    background: linear-gradient(160deg, #1e2140 0%, #171a30 100%);
+    padding: 32px; border-radius: 20px; width: 100%; max-width: 400px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .settings-title { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+  .settings-title h2 { color: #fff; font-size: 20px; font-weight: 700; }
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600;
+    color: #9ca3d4; letter-spacing: 0.3px;
+  }
+  .field input, .field select {
+    width: 100%; padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+    font-size: 14px; background: rgba(255,255,255,0.05); color: #fff; outline: none;
+  }
+  .field select option { color: #000; }
+  #save-settings-btn {
+    width: 100%; padding: 14px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white; border: none; border-radius: 12px;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 8px 20px rgba(99,102,241,0.35);
+    margin-top: 8px;
+  }
+  .hint {
+    font-size: 12px; color: #6b7299; margin-top: 20px; line-height: 1.6;
+  }
+
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+  @media (max-width: 480px) {
+    .hide-mobile { display: none; }
+    #sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 999; }
+  }
+</style>
+</head>
+<body>
+
+<div class="glow-1"></div>
+<div class="glow-2"></div>
+
+<div id="app">
+  <div id="sidebar">
+    <button id="new-chat-btn">＋ 新建对话</button>
+    <div id="chat-list"></div>
+  </div>
+
+  <div id="main">
+    <div id="header">
+      <div id="header-inner">
+        <div class="logo-row">
+          <button id="sidebar-toggle">☰</button>
+          <div class="logo-icon">☁️</div>
+          <h1>Nimbus</h1>
+        </div>
+        <div class="header-btns">
+          <button class="header-btn" id="settings-btn">⚙️ <span class="hide-mobile">设置</span></button>
+          <button class="header-btn" id="clear-btn">🗑️ <span class="hide-mobile">清空</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div id="messages-wrap">
+      <div id="messages"></div>
+    </div>
+
+    <div id="input-bar">
+      <div id="input-inner">
+        <button id="search-toggle-btn" title="开启后会先联网搜索再回答">🔍 联网</button>
+        <textarea id="input-box" rows="1" placeholder="输入你的消息..."></textarea>
+        <button id="expand-btn" title="全屏输入">⤢</button>
+        <button id="send-btn">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="fullscreen-input-overlay" class="hidden">
+  <div id="fs-header">
+    <h3>全屏输入</h3>
+    <button id="fs-close-btn">✕</button>
+  </div>
+  <textarea id="fs-textarea" placeholder="在这里可以舒服地打很多字..."></textarea>
+  <div id="fs-footer">
+    <button class="edit-btn cancel" id="fs-cancel-btn" style="padding:12px 22px;font-size:14px;">取消</button>
+    <button id="fs-send-btn">发送 ➤</button>
+  </div>
+</div>
+
+<div id="settings-overlay">
+  <div id="settings-panel">
+    <div class="settings-title">
+      <div style="font-size:28px;">☁️</div>
+      <h2>Nimbus 配置</h2>
+    </div>
+    <div class="field">
+      <label>DeepSeek API 密钥</label>
+      <input type="password" id="api-key-input" placeholder="sk-xxxxxxxxxxxxxxxx">
+    </div>
+    <div class="field">
+      <label>模型选择</label>
+      <select id="model-select">
+        <option value="deepseek-chat">deepseek-chat</option>
+        <option value="deepseek-coder">deepseek-coder</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Tavily 搜索 API 密钥（选填，开启联网搜索需要）</label>
+      <input type="password" id="tavily-key-input" placeholder="tvly-xxxxxxxxxxxxxxxx">
+    </div>
+    <button id="save-settings-btn">保存设置</button>
+    <p class="hint">密钥仅保存在你的浏览器本地（localStorage），不会上传到任何第三方服务器。Tavily 密钥可在 tavily.com 免费注册获取，每月有免费额度。</p>
+  </div>
+</div>
+
+<script>
+  let conversations = [];
+  let activeId = null;
+  let loading = false;
+  let isStreaming = false;
+  let searchStatus = null; // null | 'searching'
+
+  const messagesEl = document.getElementById('messages');
+  const chatListEl = document.getElementById('chat-list');
+  const inputBox = document.getElementById('input-box');
+  const sendBtn = document.getElementById('send-btn');
+  const settingsOverlay = document.getElementById('settings-overlay');
+  const apiKeyInput = document.getElementById('api-key-input');
+  const modelSelect = document.getElementById('model-select');
+  const tavilyKeyInput = document.getElementById('tavily-key-input');
+  const sidebar = document.getElementById('sidebar');
+  let webSearchEnabled = localStorage.getItem('webSearchEnabled') === 'true';
+
+  function uid() {
+    return 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function loadConversations() {
+    const raw = localStorage.getItem('deepseekConversations');
+    if (raw) {
+      try { conversations = JSON.parse(raw); } catch (e) { conversations = []; }
+    }
+    const savedActive = localStorage.getItem('deepseekActiveId');
+    if (conversations.length === 0) {
+      createNewChat(false);
+    } else {
+      activeId = (savedActive && conversations.find(c => c.id === savedActive))
+        ? savedActive
+        : conversations[0].id;
+    }
+  }
+
+  function saveConversations() {
+    localStorage.setItem('deepseekConversations', JSON.stringify(conversations));
+    localStorage.setItem('deepseekActiveId', activeId);
+  }
+
+  function getActiveConv() {
+    return conversations.find(c => c.id === activeId);
+  }
+
+  function createNewChat(render = true) {
+    const conv = { id: uid(), title: '新对话', messages: [], pinned: false };
+    conversations.unshift(conv);
+    activeId = conv.id;
+    saveConversations();
+    if (render) { renderChatList(); renderMessages(); }
+  }
+
+  function switchChat(id) {
+    activeId = id;
+    editingIdx = null;
+    renamingId = null;
+    saveConversations();
+    renderChatList();
+    renderMessages();
+    if (window.innerWidth <= 480) sidebar.classList.add('collapsed');
+  }
+
+  function deleteChat(id, e) {
+    e.stopPropagation();
+    if (!confirm('删除这个对话？')) return;
+    conversations = conversations.filter(c => c.id !== id);
+    if (conversations.length === 0) {
+      createNewChat(false);
+    } else if (activeId === id) {
+      activeId = conversations[0].id;
+    }
+    saveConversations();
+    renderChatList();
+    renderMessages();
+  }
+
+  let renamingId = null;
+
+  function renderChatList() {
+    const pinned = conversations.filter(c => c.pinned);
+    const others = conversations.filter(c => !c.pinned);
+
+    function itemHtml(c) {
+      if (renamingId === c.id) {
+        return `
+          <div class="chat-item ${c.id === activeId ? 'active' : ''} ${c.pinned ? 'pinned' : ''}" data-id="${c.id}">
+            <input class="rename-input" id="rename-input-${c.id}" value="${escapeHtml(c.title)}" />
+          </div>`;
+      }
+      return `
+        <div class="chat-item ${c.id === activeId ? 'active' : ''} ${c.pinned ? 'pinned' : ''}" data-id="${c.id}">
+          <span class="title">${escapeHtml(c.title)}</span>
+          <span class="pin-btn" data-pin="${c.id}" title="${c.pinned ? '取消置顶' : '置顶'}">📌</span>
+          <span class="rename-btn" data-rename="${c.id}" title="重命名">✎</span>
+          <span class="del-btn" data-del="${c.id}" title="删除">✕</span>
+        </div>`;
+    }
+
+    let html = '';
+    if (pinned.length > 0) {
+      html += `<div class="pin-divider">已置顶</div>`;
+      html += pinned.map(itemHtml).join('');
+      html += `<div class="pin-divider">全部对话</div>`;
+    }
+    html += others.map(itemHtml).join('');
+
+    chatListEl.innerHTML = html;
+
+    chatListEl.querySelectorAll('.chat-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-pin],[data-rename],[data-del]') || e.target.tagName === 'INPUT') return;
+        switchChat(el.dataset.id);
+      });
+    });
+    chatListEl.querySelectorAll('[data-del]').forEach(el => {
+      el.addEventListener('click', (e) => deleteChat(el.dataset.del, e));
+    });
+    chatListEl.querySelectorAll('[data-pin]').forEach(el => {
+      el.addEventListener('click', (e) => { e.stopPropagation(); togglePin(el.dataset.pin); });
+    });
+    chatListEl.querySelectorAll('[data-rename]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        renamingId = el.dataset.rename;
+        renderChatList();
+        const input = document.getElementById('rename-input-' + renamingId);
+        if (input) {
+          input.focus();
+          input.select();
+          input.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') confirmRename(renamingId, input.value);
+            if (ev.key === 'Escape') { renamingId = null; renderChatList(); }
+          });
+          input.addEventListener('blur', () => confirmRename(renamingId, input.value));
+        }
+      });
+    });
+  }
+
+  function togglePin(id) {
+    const conv = conversations.find(c => c.id === id);
+    if (conv) conv.pinned = !conv.pinned;
+    saveConversations();
+    renderChatList();
+  }
+
+  function confirmRename(id, newTitle) {
+    const conv = conversations.find(c => c.id === id);
+    if (conv) {
+      const trimmed = newTitle.trim();
+      if (trimmed) conv.title = trimmed;
+    }
+    renamingId = null;
+    saveConversations();
+    renderChatList();
+  }
+
+  const savedKey = localStorage.getItem('deepseekApiKey');
+  const savedModel = localStorage.getItem('deepseekModel');
+  const savedTavilyKey = localStorage.getItem('tavilyApiKey');
+  if (savedKey) {
+    apiKeyInput.value = savedKey;
+    settingsOverlay.classList.add('hidden');
+  }
+  if (savedModel) modelSelect.value = savedModel;
+  if (savedTavilyKey) tavilyKeyInput.value = savedTavilyKey;
+
+  function getApiKey() { return localStorage.getItem('deepseekApiKey') || ''; }
+  function getModel() { return localStorage.getItem('deepseekModel') || 'deepseek-chat'; }
+  function getTavilyKey() { return localStorage.getItem('tavilyApiKey') || ''; }
+
+  let editingIdx = null;
+
+  function renderMessages() {
+    const conv = getActiveConv();
+    const msgs = conv ? conv.messages : [];
+
+    if (msgs.length === 0 && !loading) {
+      messagesEl.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">☁️</div>
+          <p>开始和 Nimbus 聊天吧</p>
+        </div>`;
+      return;
+    }
+
+    let html = '';
+    msgs.forEach((msg, idx) => {
+      const isUser = msg.role === 'user';
+      const isStreamingPlaceholder = !isUser && idx === msgs.length - 1 && isStreaming && msg.content === '';
+      if (isStreamingPlaceholder) return; // 还没收到任何内容时不渲染空气泡，交给下方 loading 指示器显示
+
+      if (editingIdx === idx) {
+        html += `
+          <div class="msg-row ${isUser ? 'user' : 'assistant'}">
+            ${!isUser ? '<div class="avatar">☁️</div>' : ''}
+            <div class="msg-col ${isUser ? 'user' : 'assistant'}" style="width:100%;">
+              <textarea class="edit-textarea" id="edit-box-${idx}" rows="3">${escapeHtml(msg.content)}</textarea>
+              <div class="edit-actions">
+                <button class="edit-btn save" data-save="${idx}">保存并重新生成</button>
+                <button class="edit-btn cancel" data-cancel="${idx}">取消</button>
+              </div>
+            </div>
+          </div>`;
+        return;
+      }
+
+      const sourcesHtml = (!isUser && msg.sources && msg.sources.length > 0)
+        ? `<div class="search-sources">
+            🔍 参考来源：<br>
+            ${msg.sources.map((s, i) => `<a href="${s.url}" target="_blank" rel="noopener">[${i + 1}] ${escapeHtml(s.title)}</a>`).join('<br>')}
+          </div>`
+        : '';
+
+      html += `
+        <div class="msg-row ${isUser ? 'user' : 'assistant'}">
+          ${!isUser ? '<div class="avatar">☁️</div>' : ''}
+          <div class="msg-col ${isUser ? 'user' : 'assistant'}">
+            <div class="bubble ${isUser ? 'user' : 'assistant'}">${isUser ? escapeHtml(msg.content) : renderMarkdown(msg.content)}${(!isUser && idx === msgs.length - 1 && isStreaming) ? '<span class="cursor-blink"></span>' : ''}${sourcesHtml}</div>
+            <div class="msg-actions">
+              ${isUser
+                ? `<button class="action-btn" data-edit="${idx}">✎ 编辑</button>`
+                : `<button class="action-btn" data-regen="${idx}">↻ 重新生成</button>`}
+            </div>
+          </div>
+        </div>`;
+    });
+
+    if (loading) {
+      const loadingText = searchStatus === 'searching' ? '🔍 正在联网搜索...' : 'Nimbus 正在思考中...';
+      html += `
+        <div class="msg-row assistant">
+          <div class="avatar">☁️</div>
+          <div class="loading-row">
+            <div class="spinner"></div>
+            ${loadingText}
+          </div>
+        </div>`;
+    }
+
+    messagesEl.innerHTML = html;
+    document.getElementById('messages-wrap').scrollTop = document.getElementById('messages-wrap').scrollHeight;
+
+    messagesEl.querySelectorAll('[data-edit]').forEach(el => {
+      el.addEventListener('click', () => {
+        editingIdx = parseInt(el.dataset.edit);
+        renderMessages();
+        const box = document.getElementById('edit-box-' + editingIdx);
+        if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+      });
+    });
+    messagesEl.querySelectorAll('[data-cancel]').forEach(el => {
+      el.addEventListener('click', () => { editingIdx = null; renderMessages(); });
+    });
+    messagesEl.querySelectorAll('[data-save]').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.save);
+        const box = document.getElementById('edit-box-' + idx);
+        const newText = box.value.trim();
+        if (!newText) return;
+        editUserMessageAndRegenerate(idx, newText);
+      });
+    });
+    messagesEl.querySelectorAll('[data-regen]').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.regen);
+        regenerateFrom(idx);
+      });
+    });
+    messagesEl.querySelectorAll('[data-copy-target]').forEach(el => {
+      el.addEventListener('click', () => {
+        const codeEl = document.getElementById(el.dataset.copyTarget);
+        if (!codeEl) return;
+        navigator.clipboard.writeText(codeEl.textContent).then(() => {
+          const original = el.textContent;
+          el.textContent = '已复制 ✓';
+          setTimeout(() => { el.textContent = original; }, 1500);
+        });
+      });
+    });
+  }
+
+  // 编辑某条用户消息，删除它之后的所有消息，然后重新请求
+  function editUserMessageAndRegenerate(idx, newText) {
+    const conv = getActiveConv();
+    conv.messages = conv.messages.slice(0, idx);
+    conv.messages.push({ role: 'user', content: newText });
+    if (idx === 0) {
+      conv.title = newText.length > 20 ? newText.slice(0, 20) + '...' : newText;
+    }
+    editingIdx = null;
+    saveConversations();
+    renderChatList();
+    fetchAssistantReply();
+  }
+
+  // 重新生成某条 AI 回复：删掉它（以及它之后的一切），重新请求
+  function regenerateFrom(idx) {
+    const conv = getActiveConv();
+    conv.messages = conv.messages.slice(0, idx);
+    saveConversations();
+    fetchAssistantReply();
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // 轻量级 Markdown 渲染：代码块、行内代码、粗体、斜体、链接、列表
+  let codeBlockCounter = 0;
+  function renderMarkdown(raw) {
+    const codeBlocks = [];
+    // 先提取代码块，避免内部内容被其他规则误处理
+    let text = raw.replace(/```(\w*)\n?([\s\S]*?)```/g, (m, lang, code) => {
+      const idx = codeBlocks.length;
+      codeBlocks.push({ lang: lang || 'text', code: code.replace(/\n$/, '') });
+      return `\u0000CODEBLOCK${idx}\u0000`;
+    });
+
+    text = escapeHtml(text);
+
+    // 行内代码
+    text = text.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    // 粗体 / 斜体
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+    // 链接
+    text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+    // 按行处理列表和段落
+    const lines = text.split('\n');
+    let html = '';
+    let inList = false;
+    let listType = null;
+
+    lines.forEach(line => {
+      const ulMatch = line.match(/^[-*]\s+(.*)/);
+      const olMatch = line.match(/^\d+\.\s+(.*)/);
+
+      if (ulMatch || olMatch) {
+        const type = ulMatch ? 'ul' : 'ol';
+        const content = ulMatch ? ulMatch[1] : olMatch[1];
+        if (!inList || listType !== type) {
+          if (inList) html += `</${listType}>`;
+          html += `<${type}>`;
+          inList = true;
+          listType = type;
+        }
+        html += `<li>${content}</li>`;
+      } else {
+        if (inList) { html += `</${listType}>`; inList = false; listType = null; }
+        if (line.trim() === '') {
+          // 段落分隔，跳过
+        } else if (line.match(/^\u0000CODEBLOCK\d+\u0000$/)) {
+          html += line;
+        } else {
+          html += `<p>${line}</p>`;
+        }
+      }
+    });
+    if (inList) html += `</${listType}>`;
+
+    // 把代码块占位符替换回真正的代码块 HTML
+    html = html.replace(/\u0000CODEBLOCK(\d+)\u0000/g, (m, idx) => {
+      const block = codeBlocks[parseInt(idx)];
+      const blockId = 'code-' + (codeBlockCounter++);
+      return `
+        <div class="code-block">
+          <div class="code-block-header">
+            <span>${escapeHtml(block.lang)}</span>
+            <button class="code-copy-btn" data-copy-target="${blockId}">复制</button>
+          </div>
+          <pre><code id="${blockId}">${escapeHtml(block.code)}</code></pre>
+        </div>`;
+    });
+
+    return html;
+  }
+
+  async function sendMessage() {
+    const text = inputBox.value.trim();
+    const apiKey = getApiKey();
+
+    if (!apiKey) {
+      settingsOverlay.classList.remove('hidden');
+      return;
+    }
+    if (!text || loading) return;
+
+    const conv = getActiveConv();
+    conv.messages.push({ role: 'user', content: text });
+
+    if (conv.messages.length === 1) {
+      conv.title = text.length > 20 ? text.slice(0, 20) + '...' : text;
+    }
+
+    inputBox.value = '';
+    fsTextarea.value = '';
+    saveConversations();
+    renderChatList();
+    await fetchAssistantReply();
+  }
+
+  // 调用 Tavily 搜索 API，返回结果列表
+  async function performWebSearch(query) {
+    const tavilyKey = getTavilyKey();
+    const response = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: tavilyKey,
+        query: query,
+        search_depth: 'basic',
+        max_results: 5,
+        include_answer: false,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('搜索请求失败 (状态码 ' + response.status + ')');
+    }
+    const data = await response.json();
+    return (data.results || []).map(r => ({
+      title: r.title,
+      url: r.url,
+      content: (r.content || '').slice(0, 500),
+    }));
+  }
+
+  // 向 API 发起请求并把结果以流式方式追加到当前对话
+  async function fetchAssistantReply() {
+    const apiKey = getApiKey();
+    const conv = getActiveConv();
+
+    loading = true;
+    isStreaming = true;
+    searchStatus = null;
+    renderMessages();
+    updateSendBtn();
+
+    // 先插入一个空的助手占位消息，用于流式填充
+    const placeholder = { role: 'assistant', content: '' };
+    conv.messages.push(placeholder);
+    let streamStarted = false;
+
+    // 找到最后一条用户消息，用它去搜索
+    let apiMessages = conv.messages.slice(0, -1);
+    let searchSources = null;
+
+    try {
+      if (webSearchEnabled) {
+        const lastUserMsg = [...apiMessages].reverse().find(m => m.role === 'user');
+        if (lastUserMsg) {
+          searchStatus = 'searching';
+          renderMessages();
+          try {
+            searchSources = await performWebSearch(lastUserMsg.content);
+            if (searchSources.length > 0) {
+              const contextText = searchSources
+                .map((r, i) => `[${i + 1}] ${r.title}\n${r.content}\n来源: ${r.url}`)
+                .join('\n\n');
+              // 只在发给 API 的副本里追加搜索上下文，不污染界面上显示的原始消息
+              apiMessages = apiMessages.map(m => m);
+              const lastIdx = apiMessages.map(m => m.role).lastIndexOf('user');
+              apiMessages[lastIdx] = {
+                role: 'user',
+                content: lastUserMsg.content +
+                  '\n\n[以下是相关的网络搜索结果，请参考这些资料回答上面的问题，并在回答中自然地引用信息来源]\n\n' + contextText,
+              };
+            }
+          } catch (searchErr) {
+            searchSources = null;
+            console.error('搜索失败:', searchErr);
+          }
+          searchStatus = null;
+        }
+      }
+
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey,
+        },
+        body: JSON.stringify({
+          model: getModel(),
+          messages: apiMessages,
+          temperature: 0.7,
+          max_tokens: 8000,
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error?.message || ('请求失败 (状态码 ' + response.status + ')'));
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // 最后一行可能不完整，留到下次拼接
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data:')) continue;
+          const payload = trimmed.slice(5).trim();
+          if (payload === '[DONE]') continue;
+
+          try {
+            const json = JSON.parse(payload);
+            const delta = json.choices?.[0]?.delta?.content;
+            if (delta) {
+              if (!streamStarted) { streamStarted = true; loading = false; }
+              placeholder.content += delta;
+              renderMessages();
+            }
+          } catch (e) {
+            // 忽略无法解析的分片
+          }
+        }
+      }
+
+      if (!placeholder.content) {
+        placeholder.content = '（没有收到内容，请重试）';
+      }
+      if (searchSources && searchSources.length > 0) {
+        placeholder.sources = searchSources;
+      }
+    } catch (err) {
+      placeholder.content = '❌ 错误: ' + err.message;
+    } finally {
+      loading = false;
+      isStreaming = false;
+      searchStatus = null;
+      saveConversations();
+      renderMessages();
+      updateSendBtn();
+    }
+  }
+
+  function updateSendBtn() {
+    sendBtn.disabled = loading || !inputBox.value.trim();
+    const fsBtn = document.getElementById('fs-send-btn');
+    if (fsBtn) fsBtn.disabled = loading || !document.getElementById('fs-textarea').value.trim();
+  }
+
+  inputBox.addEventListener('input', updateSendBtn);
+  inputBox.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  sendBtn.addEventListener('click', sendMessage);
+
+  // ===== 全屏输入 =====
+  const expandBtn = document.getElementById('expand-btn');
+  const fsOverlay = document.getElementById('fullscreen-input-overlay');
+  const fsTextarea = document.getElementById('fs-textarea');
+  const fsSendBtn = document.getElementById('fs-send-btn');
+  const fsCloseBtn = document.getElementById('fs-close-btn');
+  const fsCancelBtn = document.getElementById('fs-cancel-btn');
+
+  function openFullscreenInput() {
+    fsTextarea.value = inputBox.value;
+    fsOverlay.classList.remove('hidden');
+    updateFsSendBtn();
+    setTimeout(() => { fsTextarea.focus(); fsTextarea.setSelectionRange(fsTextarea.value.length, fsTextarea.value.length); }, 0);
+  }
+
+  function closeFullscreenInput(syncBack = true) {
+    if (syncBack) {
+      inputBox.value = fsTextarea.value;
+      updateSendBtn();
+      inputBox.style.height = 'auto';
+      inputBox.style.height = Math.min(inputBox.scrollHeight, 100) + 'px';
+    }
+    fsOverlay.classList.add('hidden');
+  }
+
+  function updateFsSendBtn() {
+    fsSendBtn.disabled = loading || !fsTextarea.value.trim();
+  }
+
+  expandBtn.addEventListener('click', openFullscreenInput);
+  fsCloseBtn.addEventListener('click', () => closeFullscreenInput(true));
+  fsCancelBtn.addEventListener('click', () => closeFullscreenInput(true));
+  fsTextarea.addEventListener('input', updateFsSendBtn);
+  fsTextarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeFullscreenInput(true);
+  });
+  fsSendBtn.addEventListener('click', () => {
+    inputBox.value = fsTextarea.value;
+    fsOverlay.classList.add('hidden');
+    sendMessage();
+  });
+
+  document.getElementById('new-chat-btn').addEventListener('click', () => createNewChat());
+
+  document.getElementById('sidebar-toggle').addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+  });
+
+  document.getElementById('settings-btn').addEventListener('click', () => {
+    settingsOverlay.classList.remove('hidden');
+  });
+
+  // ===== 联网搜索开关 =====
+  const searchToggleBtn = document.getElementById('search-toggle-btn');
+  function applySearchToggleUI() {
+    searchToggleBtn.classList.toggle('active', webSearchEnabled);
+  }
+  applySearchToggleUI();
+  searchToggleBtn.addEventListener('click', () => {
+    if (!webSearchEnabled && !getTavilyKey()) {
+      alert('联网搜索需要先在设置里填写 Tavily API 密钥（免费申请：tavily.com）');
+      settingsOverlay.classList.remove('hidden');
+      return;
+    }
+    webSearchEnabled = !webSearchEnabled;
+    localStorage.setItem('webSearchEnabled', webSearchEnabled);
+    applySearchToggleUI();
+  });
+
+  document.getElementById('save-settings-btn').addEventListener('click', () => {
+    const key = apiKeyInput.value.trim();
+    if (!key) { alert('请输入有效的 API 密钥'); return; }
+    localStorage.setItem('deepseekApiKey', key);
+    localStorage.setItem('deepseekModel', modelSelect.value);
+    localStorage.setItem('tavilyApiKey', tavilyKeyInput.value.trim());
+    settingsOverlay.classList.add('hidden');
+  });
+
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    if (confirm('清空当前对话的所有消息？')) {
+      const conv = getActiveConv();
+      conv.messages = [];
+      conv.title = '新对话';
+      saveConversations();
+      renderChatList();
+      renderMessages();
+    }
+  });
+
+  if (window.innerWidth <= 480) sidebar.classList.add('collapsed');
+
+  loadConversations();
+  renderChatList();
+  renderMessages();
+  updateSendBtn();
+</script>
+
+</body>
+</html>
